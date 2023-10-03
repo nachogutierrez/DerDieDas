@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "npx nodemon --experimental-fetch index.js"
+    "watch": "npx nodemon --experimental-fetch index.js",
+    "start": "node --experimental-fetch index.js"
   },
   "keywords": [],
   "author": "",
