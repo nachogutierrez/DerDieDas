@@ -1,0 +1,46 @@
+body {
+    font-family: 'Open Sans';
+}
+
+.fab-container {
+    /* Positioning */
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    bottom: 16px;
+    right: 16px;
+}
+
+.sets {
+    display: flex;
+    flex-direction: column;
+    background: blue;
+}
+
+.sets .set {
+    padding: 8px;
+    background: red;
+}
+
+.damage-effect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    /* This makes sure the red effect doesn't interfere with any interactivity */
+    background: red;
+    /* Full red background */
+    opacity: 0;
+    /* Initially, we want this to be transparent */
+    transition: opacity 0.15s ease-out;
+    /* A smooth fade-out transition */
+    z-index: 9999;
+    /* Making sure the effect appears on top of other content */
+
+    /* Apply a radial gradient mask */
+    -webkit-mask: radial-gradient(ellipse at center, transparent 40%, black 99.9%);
+    mask: radial-gradient(ellipse at center, transparent 40%, black 99.9%);
+}
