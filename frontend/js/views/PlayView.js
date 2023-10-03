@@ -1,7 +1,7 @@
 import { dom, html } from '../dom.js'
 import { loadSets } from '../sets.js'
 import { loadWords, scoreToAsset } from '../words.js'
-import { PONS } from '../pons.js'
+import { getPons } from '../pons.js'
 import { goBack } from '../navigation.js'
 
 function handleMiss(words, word) {
@@ -15,7 +15,7 @@ function handleHit(words, word) {
 export default function PlayView({ setName }) {
     const sets = loadSets()
     const words = loadWords()
-    const pons = PONS()
+    const pons = getPons()
 
     // FIXME: sort based on hits in the past week
     const setWords = sets.getWords(setName).sort(asc(w => words.getScore(w)))
@@ -37,7 +37,7 @@ export default function PlayView({ setName }) {
                 html(`<p style='font-size: 36px'>${word}</p>`)
             ))
 
-            const wordDetails = await pons.get(word)
+            const wordDetails = await (await pons).get(word)
 
             let buttons = {}
             for (let article of ['der', 'die', 'das']) {
@@ -59,10 +59,10 @@ export default function PlayView({ setName }) {
             buttons[wordDetails.article] = TextButton({
                 text: capitalizeFirst(wordDetails.article),
                 onClick: () => {
-                    handleHit(words, word)
+
                     if (!alreadyGuessed) {
-                        // confettiEl.animate()
                         confetti()
+                        handleHit(words, word)
                     }
                     currentWordIndex++
                     alreadyGuessed = false

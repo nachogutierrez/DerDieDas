@@ -1,7 +1,7 @@
 import { dom, html } from '../dom.js'
 import { loadSets } from '../sets.js'
 import { loadWords, scoreToAsset } from '../words.js'
-import { PONS } from '../pons.js'
+import { getPons } from '../pons.js'
 import { goBack, updateUI } from '../navigation.js'
 
 import FabContainer from '../components/FabContainer.js'
@@ -17,7 +17,7 @@ async function handleSearchBarChange(pons, query, onWordsReady) {
     }
 
     // Add progress
-    const response = await pons.search(query)
+    const response = await (await pons).search(query)
     // Remove progress
     // Update and show menu
     onWordsReady(response)
@@ -43,7 +43,7 @@ function handleWordClick(word) {
 export default function SetSettingsView({ setName }) {
     const words = loadWords()
     const sets = loadSets()
-    const pons = PONS()
+    const pons = getPons()
 
     const wordList = sets.getWords(setName)
 
@@ -97,6 +97,8 @@ function AddWordDialog({ onConfirm, onSearch }) {
     const el = html(`<md-dialog></md-dialog>`)
     const listContainerEl = html(`<div style="height: 500px; overflow-y: scroll;"></div>`)
 
+    // FIXME: If I type fast then past responses can win over new responses
+    // TODO: Optimize so we don't call the api on EVERY update
     function onWordsReady(wordList) {
         const listItems = []
         for (let word of wordList) {

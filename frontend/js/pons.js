@@ -59,7 +59,13 @@ export function rawApi(api) {
     })
 }
 
-export function PONS(api = 'http://localhost:7070') {
+export async function getPons() {
+    const config = await (await fetch('config.json')).json()
+    const { apiEndpoint } = config
+    return PONS(apiEndpoint)
+}
+
+export function PONS(api = 'localhost:7070') {
     const raw = rawApi(api)
 
     async function get(word) {

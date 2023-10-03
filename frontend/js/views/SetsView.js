@@ -32,8 +32,10 @@ function handleClickSettings(setName) {
     navigateTo(SetSettingsView, { setName })
 }
 
-function handleClickSet(setName) {
-    navigateTo(PlayView, { setName })
+function handleClickSet(sets, setName) {
+    if (sets.getWords(setName).length > 0) {
+        navigateTo(PlayView, { setName })
+    }
 }
 
 /**
@@ -57,7 +59,7 @@ export default function SetsView() {
                     headline: `<strong>${setName}</strong>`,
                     supportingText: `${sets.getWords(setName).length} words`,
                     isButton: true,
-                    onClick: () => handleClickSet(setName),
+                    onClick: () => handleClickSet(sets, setName),
                     endSlotComponents: [
                         WordStatus({ wordList: sets.getWords(setName) }),
                         IconButton({ icon: 'settings', onClick: () => handleClickSettings(setName) }),

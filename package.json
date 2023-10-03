@@ -1,0 +1,5 @@
+{
+    "scripts": {
+        "deploy": "node prepareForDeployment.js PROD && firebase deploy && node prepareForDeployment.js LOCAL"
+    }
+}
