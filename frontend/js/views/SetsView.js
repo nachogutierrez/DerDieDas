@@ -55,17 +55,22 @@ export default function SetsView() {
         components.push(
             List({
                 addDivider: true,
-                items: sets.getSets().map(setName => ({
-                    headline: `<strong>${setName}</strong>`,
-                    supportingText: `${sets.getWords(setName).length} words`,
-                    isButton: true,
-                    onClick: () => handleClickSet(sets, setName),
-                    endSlotComponents: [
-                        WordStatus({ wordList: sets.getWords(setName) }),
+                items: sets.getSets().map(setName => {
+                    const endSlotComponents = [
                         IconButton({ icon: 'settings', onClick: () => handleClickSettings(setName) }),
                         IconButton({ icon: 'delete', onClick: () => handleDeleteSet(sets, setName) })
                     ]
-                }))
+                    if (sets.getWords(setName).length > 0) {
+                        endSlotComponents.unshift(WordStatus({ wordList: sets.getWords(setName) }))
+                    }
+                    return {
+                        headline: `<strong>${setName}</strong>`,
+                        supportingText: `${sets.getWords(setName).length} words`,
+                        isButton: true,
+                        onClick: () => handleClickSet(sets, setName),
+                        endSlotComponents
+                    }
+                })
             })
         )
     } else {
