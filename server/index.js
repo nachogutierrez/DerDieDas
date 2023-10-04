@@ -18,8 +18,11 @@ const options = {
 
 app.use(async (req, res, next) => {
     const url = `${PONS_API}${req.originalUrl}`
-    console.log(`${formatDate(new Date())} Calling PONS api: ${url} Status=${res.statusCode}`)
     const ponsResponse = await fetch(url, options)
+    console.log(`${formatDate(new Date())} Calling PONS api: ${url} Status=${ponsResponse.status}`)
+    if (ponsResponse.status > 400) {
+        console.error(await ponsResponse.text())
+    }
     res.status(ponsResponse.status).send(await ponsResponse.text())
 })
 
