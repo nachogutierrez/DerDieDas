@@ -91,16 +91,6 @@ export default function SetsView() {
     components.push(dialog)
 
     return dom('div', {}, ...components)
-    // return dom('div', {},
-    //     html('<h1>Sets</h1>'),
-    //     Sets({
-    //         setNames: sets.getSets().sort(),
-    //         onClick: handleClickSet
-    //     }),
-    //     FabContainer([
-    //         Fab({ icon: 'add', onClick: () => dialog.show() })
-    //     ]),
-    //     dialog)
 }
 
 // TODO: add description text area

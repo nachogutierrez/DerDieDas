@@ -44,3 +44,37 @@ body {
     -webkit-mask: radial-gradient(ellipse at center, transparent 40%, black 99.9%);
     mask: radial-gradient(ellipse at center, transparent 40%, black 99.9%);
 }
+
+.splashscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #caa6f6;
+    transition: all 1s ease-out;
+}
+
+.mobile-only {
+    display: none;
+    /* By default, it won't show */
+}
+
+.non-mobile {
+    display: block;
+}
+
+/* Assuming mobile is screen width up to 768px */
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+        /* Show on mobile */
+    }
+
+    .non-mobile {
+        display: none;
+    }
+}

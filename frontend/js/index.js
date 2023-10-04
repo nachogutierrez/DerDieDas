@@ -3,10 +3,15 @@ import { navigateTo, updateUI } from './navigation.js'
 import SetsView from './views/SetsView.js'
 
 window.addEventListener('load', async () => {
-    // TODO: add waiting message
+    const splash = document.querySelector('.splashscreen')
     await import('@material/web/all.js')
-    // TODO: remove waiting message
     navigateTo(SetsView)
+    setTimeout(() => {
+        splash.style.opacity = '0'
+        setTimeout(() => {
+            splash.style.display = 'none'
+        }, 1000)
+    }, 1000)
 })
 
 window.addEventListener('popstate', () => {
