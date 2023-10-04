@@ -17,10 +17,15 @@ async function handleSearchBarChange(pons, query, onWordsReady) {
     }
 
     // Add progress
-    const response = await (await pons).search(query)
+    const response = await pons.search(query)
     // Remove progress
     // Update and show menu
-    onWordsReady(response)
+
+    onWordsReady(Object.keys(response).map(word => ({ word, translation: response[word].translation })))
+    // onWordsReady(await Promise.all(response.map(async word => {
+    //     const { translation } = await pons.get(word)
+    //     return { word, translation }
+    // })))
 }
 
 async function handleAddWord(sets, setName, word) {
@@ -43,54 +48,70 @@ function handleWordClick(word) {
 export default function SetSettingsView({ setName }) {
     const words = loadWords()
     const sets = loadSets()
-    const pons = getPons()
 
     const wordList = sets.getWords(setName)
 
-    const addWordDialog = AddWordDialog({
-        onConfirm: word => handleAddWord(sets, setName, word),
-        onSearch: (query, onWordsReady) => handleSearchBarChange(pons, query, onWordsReady)
-    })
+    const root = dom('div', {})
 
-    let components = [html(`<h1>Sets > ${setName}</h1>`)]
-    components.push(Score({ wordList }))
-    if (wordList.length > 0) {
+    async function createComponents() {
+        const pons = await getPons()
+
+        const addWordDialog = AddWordDialog({
+            onConfirm: word => handleAddWord(sets, setName, word),
+            onSearch: (query, onWordsReady) => handleSearchBarChange(pons, query, onWordsReady)
+        })
+
+        let components = [html(`<h1>Sets > ${setName}</h1>`)]
+        components.push(Score({ wordList }))
+        if (wordList.length > 0) {
+            components.push(
+                List({
+                    addDivider: true,
+                    items: await Promise.all(wordList.map(async word => {
+                        const wordDetails = await pons.get(word)
+                        return {
+                            headline: `${capitalizeFirst(wordDetails.article)} ${word}`,
+                            supportingText: wordDetails.translation,
+                            onClick: () => {
+                                handleWordClick(word)
+                            },
+                            startSlotComponents: [
+                                html(`<img src='${scoreToAsset(words.getScore(word))}' width=32 height=32></img>`)
+                            ],
+                            endSlotComponents: [
+                                IconButton({ icon: 'settings', onClick: () => { } }),
+                                IconButton({ icon: 'delete', onClick: () => handleDeleteWord(sets, setName, word) })
+                            ]
+                        }
+                    }))
+                })
+            )
+        } else {
+            const addWordEl = html(`
+            <div>
+                This set is empty. Add your first word by clicking the
+                <md-fab size='small' style="margin: 0 4px 0 4px;"><md-icon slot='icon'>add</md-icon></md-fab>
+                button in the bottom-right corner.
+            </div>
+            `)
+            components.push(addWordEl)
+        }
+        components.push(addWordDialog)
         components.push(
-            List({
-                addDivider: true,
-                items: wordList.map(word => ({
-                    headline: word,
-                    onClick: () => {
-                        handleWordClick(word)
-                    },
-                    startSlotComponents: [
-                        html(`<img src='${scoreToAsset(words.getScore(word))}' width=32 height=32></img>`)
-                    ],
-                    endSlotComponents: [
-                        IconButton({ icon: 'settings', onClick: () => { } }),
-                        IconButton({ icon: 'delete', onClick: () => handleDeleteWord(sets, setName, word) })
-                    ]
-                }))
-            })
+            FabContainer([
+                Fab({ icon: 'add', onClick: () => { addWordDialog.show() } }),
+            ])
         )
-    } else {
-        const addWordEl = html(`
-        <div>
-            This set is empty. Add your first word by clicking the
-            <md-fab size='small' style="margin: 0 4px 0 4px;"><md-icon slot='icon'>add</md-icon></md-fab>
-            button in the bottom-right corner.
-        </div>
-        `)
-        components.push(addWordEl)
-    }
-    components.push(addWordDialog)
-    components.push(
-        FabContainer([
-            Fab({ icon: 'add', onClick: () => { addWordDialog.show() } }),
-        ])
-    )
 
-    return dom('div', {}, ...components)
+        for (let component of components) {
+            root.appendChild(component)
+        }
+    }
+
+    createComponents()
+
+    // return dom('div', {}, ...components)
+    return root
 }
 
 function AddWordDialog({ onConfirm, onSearch }) {
@@ -101,9 +122,13 @@ function AddWordDialog({ onConfirm, onSearch }) {
     // TODO: Optimize so we don't call the api on EVERY update
     function onWordsReady(wordList) {
         const listItems = []
-        for (let word of wordList) {
+        for (let wordItem of wordList) {
+            const { word, translation } = wordItem
             listItems.push({
-                headline: word, isButton: true, onClick: item => {
+                headline: word,
+                supportingText: translation,
+                isButton: true,
+                onClick: item => {
                     onConfirm(item.headline)
                     el.close()
                 }
@@ -135,4 +160,8 @@ function SearchBar({ onChange }) {
     })
 
     return el
+}
+
+function capitalizeFirst(s) {
+    return s[0].toUpperCase() + s.slice(1)
 }

@@ -31,27 +31,6 @@ function jsonApiActions(api, endpoints = {}) {
     return actions
 }
 
-function cachedActions(name, actions = {}, options = {}) {
-    const { cacheCapacity = 100 } = options
-    const lru = getCache(name)
-    cachedVersion = {}
-    for (let key in actions) {
-        cachedVersion[key] = function (...params) {
-            const cacheKey = JSON.stringify([key, ...params])
-            const response = lru.get(cacheKey)
-            if (response < 0) {
-                console.log(`Calling ${cacheKey}`)
-                response = actions[key](...params)
-                lru.put(cacheKey, response)
-                localStorage.setItem(name, serialize(lru))
-            } else {
-                console.log(`Found ${cacheKey} in cache`)
-            }
-            return response
-        }
-    }
-}
-
 export function rawApi(api) {
     return jsonApiActions(api, {
         dictionaries: () => '/v1/dictionaries?language=en',
@@ -69,41 +48,32 @@ export function PONS(api = 'localhost:7070') {
     const raw = rawApi(api)
 
     async function get(word) {
-        const wordsLru = getCache('words')
-        const item = wordsLru.get(word)
-        if (!(item < 0)) {
-            return item
-        }
         const response = await search(word)
-        if (response.includes(word)) {
-            return wordsLru.get(word)
-        }
-        return undefined
+        return response[word]
     }
 
-    async function search(query) {
+    async function search(query, ignoreCache = false) {
 
         let responsesLru = getCache('api_responses')
         const cachedResponse = responsesLru.get(query)
-        if (!(cachedResponse < 0)) {
+        if (!(cachedResponse < 0) && !ignoreCache) {
             console.debug(`search("${query}") cache hit`)
             return cachedResponse
         }
         console.debug(`search("${query}") cache miss`)
 
-        const headwords = []
+        const wordMap = {}
         let hits = []
-        const wordsLru = getCache('words')
         let response = await raw.dictionary({ l: 'deen', q: query, inLanguage: 'de', fm: true })
         if (response) {
             response = response[0]
             hits = response.hits
         }
 
-
         const validCharactersRegex = /^[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZäöüßÄÖÜ-]+$/
 
         // Some words don't have two parts, like Eis
+        // Investigate weird cases like Disco or App
         const pluralRegex = /<span class="flexion">&lt;(.+), (.+)&gt;<\/span>/
         const genderRegex = /<acronym title="(\w+)">(m|nt|f)<\/acronym>/
 
@@ -144,15 +114,24 @@ export function PONS(api = 'localhost:7070') {
                 pluralWord,
                 translation
             }
-            wordsLru.put(word, item)
-            headwords.push(word)
+
+            if (wordMap[word] === undefined) {
+                wordMap[word] = item
+            } else {
+                console.log(`Attempted to insert ${word} in wordMap.`);
+                if (item.article !== wordMap[word].article) {
+                    console.error(`Same word but different artcles`);
+                    console.log({ current: wordMap[word], new: item });
+                } else if (!wordMap[word].translation.includes(item.translation)) {
+                    wordMap[word].translation += `, ${item.translation}`
+                }
+            }
         }
 
         responsesLru = getCache('api_responses')
-        responsesLru.put(query, headwords)
+        responsesLru.put(query, wordMap)
         saveCache('api_responses', responsesLru)
-        saveCache('words', wordsLru)
-        return headwords
+        return wordMap
     }
 
     return {

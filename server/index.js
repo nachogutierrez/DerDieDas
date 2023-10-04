@@ -3,7 +3,7 @@ import cors from 'cors'
 import fs from 'fs/promises'
 
 // Maybe replace with dotenv
-const SECRETS = JSON.parse(await fs.readFile('secrets.json', 'utf-8'))
+const SECRETS = JSON.parse(await fs.readFile('.secrets.json', 'utf-8'))
 const PORT = process.env.PONS_API_PORT || 7070
 const PONS_API = 'https://api.pons.com'
 const app = express()
@@ -18,7 +18,7 @@ const options = {
 
 app.use(async (req, res, next) => {
     const url = `${PONS_API}${req.originalUrl}`
-    console.log(`Calling PONS api: ${url}`)
+    console.log(`${formatDate(new Date())} Calling PONS api: ${url} Status=${res.statusCode}`)
     const ponsResponse = await fetch(url, options)
     res.status(ponsResponse.status).send(await ponsResponse.text())
 })
@@ -26,3 +26,16 @@ app.use(async (req, res, next) => {
 app.listen(PORT, () => {
     console.log(`app listening on port ${PORT}`)
 })
+
+function formatDate(d) {
+    const pad = (n) => (n < 10 ? '0' + n : n);
+
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);  // Months are zero-based
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const min = pad(d.getMinutes());
+    const ss = pad(d.getSeconds());
+
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+}
