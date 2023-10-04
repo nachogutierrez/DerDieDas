@@ -19,13 +19,8 @@ async function handleSearchBarChange(pons, query, onWordsReady) {
     // Add progress
     const response = await pons.search(query)
     // Remove progress
-    // Update and show menu
 
     onWordsReady(Object.keys(response).map(word => ({ word, translation: response[word].translation })))
-    // onWordsReady(await Promise.all(response.map(async word => {
-    //     const { translation } = await pons.get(word)
-    //     return { word, translation }
-    // })))
 }
 
 async function handleAddWord(sets, setName, word) {
@@ -110,7 +105,6 @@ export default function SetSettingsView({ setName }) {
 
     createComponents()
 
-    // return dom('div', {}, ...components)
     return root
 }
 
@@ -118,7 +112,6 @@ function AddWordDialog({ onConfirm, onSearch }) {
     const el = html(`<md-dialog></md-dialog>`)
     const listContainerEl = html(`<div style="height: 500px; overflow-y: scroll;"></div>`)
 
-    // FIXME: If I type fast then past responses can win over new responses
     // TODO: Optimize so we don't call the api on EVERY update
     function onWordsReady(wordList) {
         const listItems = []
@@ -140,13 +133,32 @@ function AddWordDialog({ onConfirm, onSearch }) {
         }
     }
 
+    let last = undefined
+
     el.appendChild(dom('form', { method: 'dialog', id: 'form-id', slot: 'content' },
-        SearchBar({ onChange: query => onSearch(query, onWordsReady) }),
+        SearchBar({
+            onChange: query => {
+                if (last !== undefined) {
+                    last.cancel()
+                }
+                listContainerEl.innerHTML = ''
+                listContainerEl.appendChild(ProgressIndicator())
+                last = cancellableCallback(onWordsReady)
+                return onSearch(query, last)
+            }
+        }),
         listContainerEl
     ))
     return el
 }
 
+function ProgressIndicator() {
+    return html(`
+    <div style='display: flex; justify-content: center;'>
+        <md-circular-progress indeterminate></md-circular-progress>
+    </div>
+    `)
+}
 
 function SearchBar({ onChange }) {
     const el = html(`
@@ -164,4 +176,17 @@ function SearchBar({ onChange }) {
 
 function capitalizeFirst(s) {
     return s[0].toUpperCase() + s.slice(1)
+}
+
+function cancellableCallback(cb) {
+    let canceled = false
+    const newCallback = function (...args) {
+        if (!canceled) {
+            cb(...args)
+        }
+    }
+    newCallback.cancel = function () {
+        canceled = true
+    }
+    return newCallback
 }

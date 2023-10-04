@@ -118,7 +118,6 @@ export function PONS(api = 'localhost:7070') {
             if (wordMap[word] === undefined) {
                 wordMap[word] = item
             } else {
-                console.log(`Attempted to insert ${word} in wordMap.`);
                 if (item.article !== wordMap[word].article) {
                     console.error(`Same word but different artcles`);
                     console.log({ current: wordMap[word], new: item });
