@@ -3,6 +3,7 @@ import { loadSets } from '../sets.js'
 import { loadWords, scoreToAsset } from '../words.js'
 import { getPons } from '../pons.js'
 import { goBack } from '../navigation.js'
+import { shuffle } from '../array.js'
 
 function handleMiss(words, word) {
     words.miss(word)
@@ -17,8 +18,30 @@ export default function PlayView({ setName }) {
     const words = loadWords()
     const pons = getPons()
 
-    // FIXME: sort based on hits in the past week
-    const setWords = sets.getWords(setName).sort(asc(w => words.getScore(w)))
+    const wordsByScore = {}
+    wordsByScore[0] = []
+    wordsByScore[1] = []
+    wordsByScore[2] = []
+    wordsByScore[3] = []
+    wordsByScore[4] = []
+    for (let word of sets.getWords(setName)) {
+        const score = words.getScore(word)
+        wordsByScore[score].push(word)
+    }
+    shuffle(wordsByScore[0])
+    shuffle(wordsByScore[1])
+    shuffle(wordsByScore[2])
+    shuffle(wordsByScore[3])
+    shuffle(wordsByScore[4])
+    const setWords = [
+        ...wordsByScore[0],
+        ...wordsByScore[1],
+        ...wordsByScore[2],
+        ...wordsByScore[3],
+        ...wordsByScore[4],
+    ]
+
+
     let currentWordIndex = 0
     let alreadyGuessed = false
 
