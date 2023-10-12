@@ -1,7 +1,7 @@
 import { dom, html } from '../dom.js'
 import { loadSets } from '../sets.js'
 import { loadWords, scoreToAsset } from '../words.js'
-import { getPons } from '../pons.js'
+import { getApi } from '../api.js'
 import { goBack } from '../navigation.js'
 import { shuffle } from '../array.js'
 
@@ -16,7 +16,7 @@ function handleHit(words, word) {
 export default function PlayView({ setName }) {
     const sets = loadSets()
     const words = loadWords()
-    const pons = getPons()
+    const api = getApi()
 
     const wordsByScore = {}
     wordsByScore[0] = []
@@ -60,7 +60,7 @@ export default function PlayView({ setName }) {
                 html(`<p style='font-size: 36px'>${word}</p>`)
             ))
 
-            const wordDetails = await (await pons).get(word)
+            const wordDetails = await (await api).get(word)
 
             let buttons = {}
             for (let article of ['der', 'die', 'das']) {

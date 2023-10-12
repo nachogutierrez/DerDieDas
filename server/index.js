@@ -1,29 +1,50 @@
 import express from 'express'
 import cors from 'cors'
+import DB from './elasticsearch/db.js'
 import fs from 'fs/promises'
 
 // Maybe replace with dotenv
-const SECRETS = JSON.parse(await fs.readFile('.secrets.json', 'utf-8'))
 const PORT = process.env.PONS_API_PORT || 7070
-const PONS_API = 'https://api.pons.com'
 const app = express()
+const db = DB()
+
+const articles = { m: 'der', n: 'das', f: 'die' }
 
 app.use(cors())
 
-const options = {
-    headers: {
-        'X-Secret': SECRETS['pons.secret']
+function formatDocument(document) {
+    return {
+        ...document._source,
+        article: articles[document._source.genus]
     }
 }
 
-app.use(async (req, res, next) => {
-    const url = `${PONS_API}${req.originalUrl}`
-    const ponsResponse = await fetch(url, options)
-    console.log(`${formatDate(new Date())} Calling PONS api: ${url} Status=${ponsResponse.status}`)
-    if (ponsResponse.status > 400) {
-        console.error(await ponsResponse.text())
+app.get('/search', async (req, res) => {
+    const { query } = req.query
+    try {
+        const response = await db.search(query)
+        const mapped = response.map(formatDocument)
+        res.json(mapped)
+        console.log(`${formatDate(new Date())} GET /search?query=${query} Status=200`)
+    } catch (e) {
+        console.log(`${formatDate(new Date())} GET /search?query=${query} Status=400`)
+        throw e
     }
-    res.status(ponsResponse.status).send(await ponsResponse.text())
+})
+
+app.get('/get', async (req, res) => {
+    const { query } = req.query
+    const response = await db.get(query)
+    let status = 200
+    if (response.length === 0) {
+        status = 404
+        res.status(404).send('Not found')
+    } else {
+        const mapped = response.map(formatDocument)
+        res.json(mapped[0])
+    }
+
+    console.log(`${formatDate(new Date())} GET /get?query=${query} Status=${status}`)
 })
 
 app.listen(PORT, () => {
