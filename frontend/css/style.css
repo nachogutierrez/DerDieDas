@@ -12,7 +12,22 @@ body {
     right: 16px;
 }
 
-.sets {
+.experience-bar-container {
+    width: 256px;
+    height: 16px;
+    border: 1px solid black;
+}
+
+.experience-bar {
+    height: 100%;
+    background: gold;
+}
+
+.experience-bar.animate {
+    transition: width 0.3s ease;
+}
+
+/* .sets {
     display: flex;
     flex-direction: column;
     background: blue;
@@ -21,7 +36,7 @@ body {
 .sets .set {
     padding: 8px;
     background: red;
-}
+} */
 
 .damage-effect {
     position: absolute;

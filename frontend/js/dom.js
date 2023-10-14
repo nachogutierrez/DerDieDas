@@ -3,7 +3,7 @@ export function dom(elType, attrs = {}, ...children) {
     for (let key of Object.keys(attrs)) {
         el.setAttribute(key, attrs[key])
     }
-    children.forEach(c => el.appendChild(c))
+    children.filter(x => x !== undefined).forEach(c => el.appendChild(c))
     return el
 }
 
@@ -11,4 +11,12 @@ export function html(htmlString) {
     const el = document.createElement('div')
     el.innerHTML = htmlString.trim()
     return el.firstChild
+}
+
+export function styleString(style = {}) {
+    let str = ''
+    for (let key of Object.keys(style)) {
+        str += `${key}:${style[key]};`
+    }
+    return str
 }

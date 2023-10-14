@@ -1,6 +1,6 @@
 import { dom, html } from '../dom.js'
 import { loadSets } from '../sets.js'
-import { loadWords, scoreToAsset } from '../words.js'
+import { loadWords, milestoneToAsset } from '../words.js'
 // import { getPons } from '../pons.js'
 import { getApi } from '../api.js'
 import { goBack, updateUI } from '../navigation.js'
@@ -10,6 +10,7 @@ import Fab from '../components/Fab.js'
 import List from '../components/List.js'
 import IconButton from '../components/IconButton.js'
 import Score from '../components/Score.js'
+import ExperienceBar from '../components/ExperienceBar.js'
 
 async function handleSearchBarChange(api, query, onWordsReady) {
     if (!query) {
@@ -61,6 +62,7 @@ export default function SetSettingsView({ setName }) {
 
         let components = [html(`<h1>Sets > ${setName}</h1>`)]
         components.push(Score({ wordList }))
+
         if (wordList.length > 0) {
             components.push(
                 List({
@@ -68,6 +70,17 @@ export default function SetSettingsView({ setName }) {
                     items: await Promise.all(wordList.map(async word => {
                         const wordDetails = await api.get(word)
                         const { key, singular, plural, article, translations } = wordDetails
+
+                        const endSlotComponents = [
+                            IconButton({ icon: 'settings', onClick: () => { } }),
+                            IconButton({ icon: 'delete', onClick: () => handleDeleteWord(sets, setName, key) })
+                        ]
+                        if (words.currentMilestone(word) < 4) {
+                            endSlotComponents.unshift(ExperienceBar({ experience: words.getExperience(word) }))
+                        } else {
+                            endSlotComponents.unshift(ExperienceBar({ experience: 1, isMaxedOut: true }))
+                        }
+
                         return {
                             headline: `${capitalizeFirst(article)} ${key}`,
                             supportingText: translations.join(', '),
@@ -75,12 +88,9 @@ export default function SetSettingsView({ setName }) {
                                 handleWordClick(key)
                             },
                             startSlotComponents: [
-                                html(`<img src='${scoreToAsset(words.getScore(key))}' width=32 height=32></img>`)
+                                html(`<img src='${milestoneToAsset(words.currentMilestone(key))}' width=32 height=32></img>`)
                             ],
-                            endSlotComponents: [
-                                IconButton({ icon: 'settings', onClick: () => { } }),
-                                IconButton({ icon: 'delete', onClick: () => handleDeleteWord(sets, setName, key) })
-                            ]
+                            endSlotComponents
                         }
                     }))
                 })
