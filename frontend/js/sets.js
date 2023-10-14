@@ -5,10 +5,10 @@ function saveSets(sets) {
 }
 
 export function loadSets() {
-    return Sets(localStorage.getItem(CACHE_KEY))
+    return Sets(localStorage.getItem(CACHE_KEY), saveSets)
 }
 
-function Sets(serializedSets = "") {
+export function Sets(serializedSets = "", save = () => { }) {
 
     let sets = {}
     if (serializedSets) {
@@ -37,12 +37,12 @@ function Sets(serializedSets = "") {
         if (!(setName in sets)) {
             sets[setName] = {}
         }
-        saveSets(this)
+        save(this)
     }
 
     function remove(setName) {
         delete sets[setName]
-        saveSets(this)
+        save(this)
     }
 
     function addWord(setName, word) {
@@ -50,7 +50,7 @@ function Sets(serializedSets = "") {
             sets[setName] = {}
         }
         sets[setName][word] = true
-        saveSets(this)
+        save(this)
     }
 
     function removeWord(setName, word) {
@@ -58,7 +58,7 @@ function Sets(serializedSets = "") {
             return
         }
         delete sets[setName][word]
-        saveSets(this)
+        save(this)
     }
 
     function serialize() {

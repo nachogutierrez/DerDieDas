@@ -7,10 +7,10 @@ function saveWords(words) {
 }
 
 export function loadWords() {
-    return Words(localStorage.getItem(CACHE_KEY))
+    return Words(localStorage.getItem(CACHE_KEY), saveWords)
 }
 
-function Words(serializedWords = "") {
+export function Words(serializedWords = "", save = () => { }) {
 
     let general = _wordTemplate()
     let words = {}
@@ -101,7 +101,7 @@ function Words(serializedWords = "") {
         words[word].attempts = words[word].attempts.slice(0, MAX_REMEMBERED_PER_WORD)
         general.attempts.unshift(timestamp)
         general.attempts = general.attempts.slice(0, MAX_REMEMBERED)
-        saveWords(this)
+        save(this)
     }
 
     function _wordTemplate() {

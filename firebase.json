@@ -14,7 +14,11 @@
     ],
     "ignore": [
       "firebase.json",
+      "config.example.json",
+      "package.json",
+      "package-lock.json",
       "**/.*",
+      "**/*.test.js",
       "**/node_modules/**"
     ],
     "rewrites": [
