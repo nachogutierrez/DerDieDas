@@ -1,7 +1,12 @@
 import { dom, html } from '../dom.js'
-import { loadSets } from '../sets.js'
-import { loadWords, milestoneToAsset } from '../words.js'
-// import { getPons } from '../pons.js'
+import { FirestoreSets } from '../sets.js'
+import {
+    FirestoreWords,
+    currentMilestone,
+    getActualScore,
+    getExperience,
+    milestoneToAsset
+} from '../words.js'
 import { getApi } from '../api.js'
 import { goBack, updateUI } from '../navigation.js'
 
@@ -11,6 +16,7 @@ import List from '../components/List.js'
 import IconButton from '../components/IconButton.js'
 import Score from '../components/Score.js'
 import ExperienceBar from '../components/ExperienceBar.js'
+import Navbar from '../components/Navbar.js'
 
 async function handleSearchBarChange(api, query, onWordsReady) {
     if (!query) {
@@ -31,9 +37,21 @@ async function handleAddWord(sets, setName, word) {
     updateUI()
 }
 
+async function handleAddWordToFirestore(firestoreSets, setName, word) {
+    await firestoreSets.addWord(setName, word)
+    updateUI()
+}
+
 function handleDeleteWord(sets, setName, word) {
     if (confirm(`Are you sure you want to delete word '${word}'`)) {
         sets.removeWord(setName, word)
+        updateUI()
+    }
+}
+
+async function handleDeleteWordFromFirestore(firestoreSets, setName, word) {
+    if (confirm(`Are you sure you want to delete word '${word}'`)) {
+        await firestoreSets.removeWord(setName, word)
         updateUI()
     }
 }
@@ -44,39 +62,56 @@ function handleWordClick(word) {
 
 // TODO: add translation
 export default function SetSettingsView({ setName }) {
-    const words = loadWords()
-    const sets = loadSets()
+    const firestoreSets = FirestoreSets()
+    const firestoreWords = FirestoreWords()
 
-    const wordList = sets.getWords(setName)
+    const containerEl = dom('div', {})
 
-    const root = dom('div', {})
+    async function doEffect() {
+        const wordDocuments = await firestoreSets.getWords(setName)
+        const wordList = wordDocuments.map(doc => doc.id)
 
-    async function createComponents() {
-        // const pons = await getPons()
+        const allScores = {}
+        const allScoresList = []
+        const allFirestoreWords = {}
+        const allFirestoreWordsList = await Promise.all(wordList.map(firestoreWords.getWord))
+
+        allFirestoreWordsList.forEach(firestoreWord => {
+            allFirestoreWords[firestoreWord.id] = firestoreWord
+            const { score, lastUpdated } = firestoreWord.data()
+            allScores[firestoreWord.id] = getActualScore(score, lastUpdated)
+            allScoresList.push(allScores[firestoreWord.id])
+        })
+
         const api = await getApi()
 
         const addWordDialog = AddWordDialog({
-            onConfirm: word => handleAddWord(sets, setName, word),
+            onConfirm: word => handleAddWordToFirestore(firestoreSets, setName, word),
             onSearch: (query, onWordsReady) => handleSearchBarChange(api, query, onWordsReady)
         })
 
-        let components = [html(`<h1>Sets > ${setName}</h1>`)]
-        components.push(Score({ wordList }))
+        let components = [
+            Navbar(),
+            html(`<h1>Sets > ${setName}</h1>`),
+            Score({ allScoresList })
+        ]
 
         if (wordList.length > 0) {
             components.push(
                 List({
                     addDivider: true,
                     items: await Promise.all(wordList.map(async word => {
-                        const wordDetails = await api.get(word)
-                        const { key, singular, plural, article, translations } = wordDetails
+                        const { key, singular, plural, article, translations } = await api.get(word)
+                        const score = allScores[word]
+
+                        console.log({ word, score, experience: getExperience(score) });
 
                         const endSlotComponents = [
                             IconButton({ icon: 'settings', onClick: () => { } }),
-                            IconButton({ icon: 'delete', onClick: () => handleDeleteWord(sets, setName, key) })
+                            IconButton({ icon: 'delete', onClick: () => handleDeleteWordFromFirestore(firestoreSets, setName, key) })
                         ]
-                        if (words.currentMilestone(word) < 4) {
-                            endSlotComponents.unshift(ExperienceBar({ experience: words.getExperience(word) }))
+                        if (currentMilestone(score) < 4) {
+                            endSlotComponents.unshift(ExperienceBar({ experience: getExperience(score) }))
                         } else {
                             endSlotComponents.unshift(ExperienceBar({ experience: 1, isMaxedOut: true }))
                         }
@@ -88,7 +123,7 @@ export default function SetSettingsView({ setName }) {
                                 handleWordClick(key)
                             },
                             startSlotComponents: [
-                                html(`<img src='${milestoneToAsset(words.currentMilestone(key))}' width=32 height=32></img>`)
+                                html(`<img src='${milestoneToAsset(currentMilestone(score))}' width=32 height=32></img>`)
                             ],
                             endSlotComponents
                         }
@@ -113,13 +148,12 @@ export default function SetSettingsView({ setName }) {
         )
 
         for (let component of components) {
-            root.appendChild(component)
+            containerEl.appendChild(component)
         }
     }
+    doEffect()
 
-    createComponents()
-
-    return root
+    return containerEl
 }
 
 function AddWordDialog({ onConfirm, onSearch }) {

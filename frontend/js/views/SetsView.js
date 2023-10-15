@@ -1,4 +1,4 @@
-import { loadSets } from '../sets.js'
+import { loadSets, FirestoreSets } from '../sets.js'
 import { dom, html } from '../dom.js'
 import { navigateTo, updateUI } from '../navigation.js'
 
@@ -12,12 +12,19 @@ import FabContainer from '../components/FabContainer.js'
 import List from '../components/List.js'
 import WordStatus from '../components/WordStatus.js'
 import Score from '../components/Score.js'
+import Navbar from '../components/Navbar.js'
+import { FirestoreWords, getActualScore } from '../words.js'
 
 /**
  * Handlers
  */
 function handleAddSet(sets, setName) {
     sets.add(setName)
+    updateUI()
+}
+
+async function handleAddSetToFirestore(firestoreSets, setName) {
+    await firestoreSets.addSet(setName)
     updateUI()
 }
 
@@ -28,12 +35,19 @@ function handleDeleteSet(sets, setName) {
     }
 }
 
+async function handleDeleteSetFromFirestore(firestoreSets, setName) {
+    if (confirm(`Are you sure you want to delete set '${setName}'`)) {
+        await firestoreSets.removeSet(setName)
+        updateUI()
+    }
+}
+
 function handleClickSettings(setName) {
     navigateTo(SetSettingsView, { setName })
 }
 
-function handleClickSet(sets, setName) {
-    if (sets.getWords(setName).length > 0) {
+function handleClickSet(setName, wordList) {
+    if (wordList.length > 0) {
         navigateTo(PlayView, { setName })
     }
 }
@@ -44,53 +58,86 @@ function handleClickSet(sets, setName) {
 export default function SetsView() {
 
     const sets = loadSets()
+    const firestoreSets = FirestoreSets()
+    const firestoreWords = FirestoreWords()
 
-    const dialog = AddSetDialog({ onConfirm: setName => handleAddSet(sets, setName) })
+    const containerEl = html('<div></div>')
 
-    const allWords = new Set(sets.getSets().flatMap(setName => sets.getWords(setName)))
+    async function doEffect() {
+        const components = [
+            Navbar(),
+            html(`<h1 style='margin: 0; padding: 0;'>Sets</h1>`)
+        ]
 
-    const components = [html('<h1>Sets</h1>')]
-    components.push(Score({ wordList: allWords }))
-    if (sets.getSets().length > 0) {
-        components.push(
-            List({
-                addDivider: true,
-                items: sets.getSets().map(setName => {
-                    const endSlotComponents = [
-                        IconButton({ icon: 'settings', onClick: () => handleClickSettings(setName) }),
-                        IconButton({ icon: 'delete', onClick: () => handleDeleteSet(sets, setName) })
-                    ]
-                    if (sets.getWords(setName).length > 0) {
-                        endSlotComponents.unshift(WordStatus({ wordList: sets.getWords(setName) }))
-                    }
-                    return {
-                        headline: `<strong>${setName}</strong>`,
-                        supportingText: `${sets.getWords(setName).length} words`,
-                        isButton: true,
-                        onClick: () => handleClickSet(sets, setName),
-                        endSlotComponents
-                    }
+        const allSets = await firestoreSets.getSets()
+        allSets.sort((a, b) => {
+            const idA = a.id
+            const idB = b.id
+            if (idA > idB) return 1
+            else if (idA < idB) return -1
+            return 0
+        })
+
+        if (allSets.length > 0) {
+            components.push(
+                List({
+                    addDivider: true,
+                    items: await Promise.all(allSets.map(async setDocument => {
+                        const setName = setDocument.id
+                        const wordDocuments = await firestoreSets.getWords(setName)
+                        const wordList = wordDocuments.map(doc => doc.id)
+
+                        const allScoresList = await Promise.all(wordList.map(async word => {
+                            const firestoreWord = await firestoreWords.getWord(word)
+                            const { score, lastUpdated } = firestoreWord.data()
+                            return getActualScore(score, lastUpdated)
+                        }))
+
+                        const endSlotComponents = [
+                            IconButton({ icon: 'settings', onClick: () => handleClickSettings(setName) }),
+                            IconButton({ icon: 'delete', onClick: () => handleDeleteSetFromFirestore(firestoreSets, setName) })
+                        ]
+                        if (wordList.length > 0) {
+                            endSlotComponents.unshift(WordStatus({ allScoresList }))
+                        }
+                        return {
+                            headline: `<strong>${setName}</strong>`,
+                            supportingText: `${wordList.length} words`,
+                            isButton: true,
+                            onClick: () => handleClickSet(setName, wordList),
+                            endSlotComponents
+                        }
+                    }))
                 })
-            })
-        )
-    } else {
-        const addWordEl = html(`
-        <div>
-            You don't have sets yet. Add your first set by clicking the
-            <md-fab size='small' style="margin: 0 4px 0 4px;"><md-icon slot='icon'>add</md-icon></md-fab>
-            button in the bottom-right corner.
-        </div>
-        `)
-        components.push(addWordEl)
-    }
-    components.push(
-        FabContainer([
-            Fab({ icon: 'add', onClick: () => dialog.show() })
-        ])
-    )
-    components.push(dialog)
+            )
+        } else {
+            const addWordEl = html(`
+            <div>
+                You don't have sets yet. Add your first set by clicking the
+                <md-fab size='small' style="margin: 0 4px 0 4px;"><md-icon slot='icon'>add</md-icon></md-fab>
+                button in the bottom-right corner.
+            </div>
+            `)
+            components.push(addWordEl)
+        }
 
-    return dom('div', {}, ...components)
+        const dialog = AddSetDialog({ onConfirm: setName => handleAddSetToFirestore(firestoreSets, setName) })
+        components.push(
+            FabContainer([
+                Fab({ icon: 'add', onClick: () => dialog.show() })
+            ])
+        )
+        components.push(dialog)
+
+        for (let c of components) {
+            containerEl.appendChild(c)
+        }
+
+    }
+    doEffect()
+
+    // return dom('div', {}, ...components)
+    return containerEl
 }
 
 // TODO: add description text area

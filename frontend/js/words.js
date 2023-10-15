@@ -1,6 +1,18 @@
+import { getFirestore, collection, addDoc, setDoc, getDocs, getDoc, deleteDoc, doc } from 'firebase/firestore'
+import { getApp, getUser } from './firebase.js'
+
+const secondsToMillis = n => 1000 * n
+const minutesToMillis = n => secondsToMillis(60) * n
+const hoursToMillis = n => minutesToMillis(60) * n
+const daysToMillis = n => hoursToMillis(24) * n
+const weeksToMillis = n => daysToMillis(7) * n
+
 const CACHE_KEY = "cached_words"
 export const MAX_REMEMBERED = 1000
-export const MAX_REMEMBERED_PER_WORD = 20
+export const MAX_REMEMBERED_PER_WORD = 16
+
+export const PENALTY_FREQUENCY = daysToMillis(1)
+export const PENALTY_GRACE_PERIOD = daysToMillis(1)
 
 const SCORE_QUARTZ = 0
 const SCORE_AMETHYST = 4
@@ -23,6 +35,7 @@ export function loadWords() {
     return Words(localStorage.getItem(CACHE_KEY), saveWords)
 }
 
+// TODO: make it so that the player loses score overtime
 export function Words(serializedWords = "", save = () => { }) {
 
     let words = {}
@@ -63,7 +76,6 @@ export function Words(serializedWords = "", save = () => { }) {
         _updateScore(word, true)
     }
 
-    // TODO: implement a less forgiving score update. If missed move score to the beginning of the previous gemstone.
     obj.miss = function (word) {
         _updateScore(word, false)
     }
@@ -153,6 +165,109 @@ export function Words(serializedWords = "", save = () => { }) {
     return obj
 }
 
+export function FirestoreWords() {
+
+    const app = getApp()
+    if (!app) {
+        throw new Error(`FirestoreSets requires Firebase app to be initialized`)
+    }
+    const user = getUser()
+    if (!user) {
+        throw new Error(`FirestoreSets requires user to be logged in`)
+    }
+    const db = getFirestore(app)
+
+    function _wordTemplate(word) {
+        return {
+            id: word,
+            data() {
+                return {
+                    score: 0,
+                    lastUpdated: 0,
+                    creatorUID: user.uid
+                }
+            }
+        }
+    }
+
+    const self = {
+        async getWord(word) {
+            const docSnapshot = await getDoc(doc(db, 'Users', user.uid, 'Words', word))
+            if (!docSnapshot.exists()) {
+                return _wordTemplate(word)
+            }
+            return docSnapshot
+        },
+        async updateWord(word, newScore) {
+            const now = new Date().getTime()
+            const newData = {
+                score: newScore,
+                lastUpdated: now,
+                creatorUID: user.uid
+            }
+            return setDoc(doc(db, 'Users', user.uid, 'Words', word), newData)
+        }
+    }
+    return self
+}
+
+export function updateScore(score, isHit) {
+    if (isHit) {
+        return Math.min(MILESTONES[MILESTONES.length - 1], score + 1)
+    } else {
+        return MILESTONES[previousMilestone(score)]
+    }
+}
+
+export function getActualScore(score, lastUpdated) {
+    const now = new Date().getTime()
+    return Math.max(0, score - penalty(now - lastUpdated, PENALTY_FREQUENCY, PENALTY_GRACE_PERIOD))
+}
+
+export function getExperience(score) {
+    const currentMilestoneScore = MILESTONES[currentMilestone(score)]
+    const nextMilestoneScore = MILESTONES[nextMilestone(score)]
+
+    if (currentMilestoneScore === MILESTONES[MILESTONES.length - 1]) {
+        return 0
+    }
+
+    return (score - currentMilestoneScore) / (nextMilestoneScore - currentMilestoneScore)
+}
+
+export function isMaxScore(score) {
+    return score === MILESTONES[MILESTONES.length - 1]
+}
+
+export function willLevelUp(score) {
+    return currentMilestone(score) !== currentMilestone(score + 1)
+}
+
+export function currentMilestone(score) {
+    const pair = MILESTONES.map((x, i) => ({ x, i })).find(({ x }) => score < x)
+    if (pair) {
+        return pair.i - 1
+    }
+    return MILESTONES.length - 1
+}
+export function nextMilestone(score) {
+    return Math.min(currentMilestone(score) + 1, MILESTONES.length - 1)
+}
+export function previousMilestone(score) {
+    return Math.max(currentMilestone(score) - 1, 0)
+}
+
+/**
+ * There's a grace period where no penalty is applied.
+ * After the grace period 1 score point is substracted regularly in accordance with the frequency parameter.
+ * 
+ * @param {*} t inactivity time
+ * @returns score penalty for having not been active during t milliseconds
+ */
+export const penalty = (t, frequency = daysToMillis(1), gracePeriod = daysToMillis(1)) => (
+    Math.floor(Math.max(0, t - gracePeriod) / frequency)
+)
+
 export function milestoneToColor(milestone) {
     switch (milestone) {
         case 0: return 'pink' // quartz
@@ -173,18 +288,4 @@ export function milestoneToAsset(milestone) {
         case 4: return 'assets/diamond.png'
         default: return ''
     }
-}
-
-export function currentMilestone(allMilestones, score) {
-    const pair = allMilestones.map((x, i) => ({ x, i })).find(({ x }) => score < x)
-    if (pair) {
-        return pair.i - 1
-    }
-    return allMilestones.length - 1
-}
-export function nextMilestone(allMilestones, score) {
-    return Math.min(currentMilestone(allMilestones, score) + 1, allMilestones.length - 1)
-}
-export function previousMilestone(allMilestones, score) {
-    return Math.max(currentMilestone(allMilestones, score) - 1, 0)
 }

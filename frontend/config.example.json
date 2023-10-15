@@ -1,3 +1,12 @@
 {
-    "apiEndpoint": "http://localhost:7070"
+    "apiEndpoint": "http://localhost:7070",
+    "firebase": {
+        "apiKey": "AIzaSyD2_-w1RJ3xOPDqS0jTNPeifZK18TERYOE",
+        "authDomain": "derdiedas-5ac4a.firebaseapp.com",
+        "projectId": "derdiedas-5ac4a",
+        "storageBucket": "derdiedas-5ac4a.appspot.com",
+        "messagingSenderId": "898324343093",
+        "appId": "1:898324343093:web:c696f9ae2a8e084741c47c",
+        "measurementId": "G-EWW1XQB8SS"
+      }
 }

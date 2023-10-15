@@ -1,12 +1,16 @@
 import PlayView from './views/PlayView.js'
 import SetsView from './views/SetsView.js'
 import SetSettingsView from './views/SetSettingsView.js'
+import LoginView from './views/LoginView.js'
 
 const views = [
     PlayView,
     SetsView,
-    SetSettingsView
+    SetSettingsView,
+    LoginView
 ]
+
+let navigationCallbacks = []
 
 function findViewByName(viewName) {
     return views.find(v => v.name === viewName)
@@ -15,8 +19,14 @@ function findViewByName(viewName) {
 // Figure out how to maintain a consistent url and navigation history
 // Might have to implement a router
 export function navigateTo(view, context = {}) {
+    navigationCallbacks.forEach(f => f())
+    navigationCallbacks = []
     history.pushState({ viewName: view.name, context }, "")
     updateUI()
+}
+
+export function onNextNavigate(f) {
+    navigationCallbacks.push(f)
 }
 
 export function goBack() {

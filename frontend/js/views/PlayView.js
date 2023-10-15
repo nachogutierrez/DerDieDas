@@ -1,6 +1,14 @@
 import { dom, html } from '../dom.js'
-import { loadSets } from '../sets.js'
-import { loadWords, milestoneToAsset } from '../words.js'
+import { FirestoreSets } from '../sets.js'
+import {
+    FirestoreWords,
+    currentMilestone,
+    getActualScore,
+    getExperience,
+    isMaxScore,
+    willLevelUp,
+    updateScore
+} from '../words.js'
 import { getApi } from '../api.js'
 import { goBack } from '../navigation.js'
 import { shuffle } from '../array.js'
@@ -11,8 +19,18 @@ import Column from '../components/Column.js'
 import Level from '../components/Level.js'
 import MilestoneIcon from '../components/MilestoneIcon.js'
 
+function handleMissFirestore(firestoreWords, word, score) {
+    const newScore = updateScore(score, false)
+    return firestoreWords.updateWord(word, newScore)
+}
+
 function handleMiss(words, word) {
     words.miss(word)
+}
+
+function handleHitFirestore(firestoreWords, word, score) {
+    const newScore = updateScore(score, true)
+    return firestoreWords.updateWord(word, newScore)
 }
 
 function handleHit(words, word) {
@@ -20,33 +38,10 @@ function handleHit(words, word) {
 }
 
 export default function PlayView({ setName }) {
-    const sets = loadSets()
-    const words = loadWords()
     const api = getApi()
-
-    const wordsByMilestone = {}
-    wordsByMilestone[0] = []
-    wordsByMilestone[1] = []
-    wordsByMilestone[2] = []
-    wordsByMilestone[3] = []
-    wordsByMilestone[4] = []
-    for (let word of sets.getWords(setName)) {
-        const milestone = words.currentMilestone(word)
-        wordsByMilestone[milestone].push(word)
-    }
-    shuffle(wordsByMilestone[0])
-    shuffle(wordsByMilestone[1])
-    shuffle(wordsByMilestone[2])
-    shuffle(wordsByMilestone[3])
-    shuffle(wordsByMilestone[4])
-    const setWords = [
-        ...wordsByMilestone[0],
-        ...wordsByMilestone[1],
-        ...wordsByMilestone[2],
-        ...wordsByMilestone[3],
-        ...wordsByMilestone[4],
-    ]
-
+    const firestoreSets = FirestoreSets()
+    const firestoreWords = FirestoreWords()
+    let allFirestoreWords = {}
 
     let currentWordIndex = 0
     let alreadyGuessed = false
@@ -55,18 +50,22 @@ export default function PlayView({ setName }) {
     const gameContainerEl = html('<div></div>')
     const damageEffectEl = html(`<div class='damage-effect'></div>`)
 
-    async function updateGameUI() {
+    async function updateGameUI(setWords) {
         gameContainerEl.innerHTML = ''
         if (currentWordIndex < setWords.length) {
             const word = setWords[currentWordIndex]
-            const milestone = words.currentMilestone(word)
             const wordDetails = await (await api).get(word)
+            const firestoreWord = allFirestoreWords[word]
+            const { score, lastUpdated } = firestoreWord.data()
+            const actualScore = getActualScore(score, lastUpdated)
+            const milestone = currentMilestone(actualScore)
+            const experience = getExperience(actualScore)
 
             let experienceBar
             if (milestone === 4) {
                 experienceBar = ExperienceBar({ experience: 1, isMaxedOut: true })
             } else {
-                experienceBar = ExperienceBar({ experience: words.getExperience(word) })
+                experienceBar = ExperienceBar({ experience })
             }
             const milestoneIcon = MilestoneIcon({
                 milestone,
@@ -90,8 +89,7 @@ export default function PlayView({ setName }) {
                         buttons[article].setAttribute('disabled', true)
                         if (!alreadyGuessed) {
                             alreadyGuessed = true
-                            const experience = words.getExperience(word)
-                            handleMiss(words, word)
+                            await handleMissFirestore(firestoreWords, word, actualScore)
                             animating = true
                             showDamageEffect(damageEffectEl)
                             if (milestone === 4) {
@@ -103,8 +101,8 @@ export default function PlayView({ setName }) {
                                 experienceBar.setExperience(0)
                                 await sleep(300)
                             }
-                            if (words.currentMilestone(word) !== milestone) {
-                                milestoneIcon.setMilestone(words.currentMilestone(word))
+                            if (milestone > 0) {
+                                milestoneIcon.setMilestone(milestone - 1)
                                 experienceBar.setAnimate(false)
                                 await sleep(0)
                                 experienceBar.setExperience(1)
@@ -128,19 +126,17 @@ export default function PlayView({ setName }) {
                     }
                     if (!alreadyGuessed) {
                         alreadyGuessed = true
-                        const willLevelUp = words.willLevelUp(word)
-                        const isMaxScore = words.isMaxScore(word)
-                        handleHit(words, word)
-                        if (!isMaxScore) {
+                        await handleHitFirestore(firestoreWords, word, actualScore)
+                        if (!isMaxScore(actualScore)) {
                             animating = true
-                            if (willLevelUp) {
+                            if (willLevelUp(actualScore)) {
                                 confetti()
                                 experienceBar.setAnimate(true)
                                 await sleep(0)
                                 experienceBar.setExperience(1)
                                 await sleep(300)
                             } else {
-                                const newExperience = words.getExperience(word)
+                                const newExperience = getExperience(actualScore + 1)
                                 experienceBar.setAnimate(true)
                                 await sleep(0)
                                 experienceBar.setExperience(newExperience)
@@ -152,7 +148,7 @@ export default function PlayView({ setName }) {
                     currentWordIndex++
                     alreadyGuessed = false
                     // Maybe add a small pause with an animation to celebrate
-                    updateGameUI()
+                    updateGameUI(setWords)
                 }
             })
 
@@ -192,7 +188,44 @@ export default function PlayView({ setName }) {
         }
     }
 
-    updateGameUI()
+    async function doEffect() {
+        const wordDocuments = await firestoreSets.getWords(setName)
+        const wordList = wordDocuments.map(doc => doc.id)
+        const allFirestoreWordsList = await Promise.all(wordList.map(firestoreWords.getWord))
+        allFirestoreWordsList.forEach(fw => {
+            allFirestoreWords[fw.id] = fw
+        })
+
+        const wordsByMilestone = {}
+        wordsByMilestone[0] = []
+        wordsByMilestone[1] = []
+        wordsByMilestone[2] = []
+        wordsByMilestone[3] = []
+        wordsByMilestone[4] = []
+        for (let word of wordList) {
+            // Maybe fetch all firestore words once and use cache afterwards
+            const firestoreWord = allFirestoreWords[word]
+            const { score, lastUpdated } = firestoreWord.data()
+            const actualScore = getActualScore(score, lastUpdated)
+            const milestone = currentMilestone(actualScore)
+            wordsByMilestone[milestone].push(word)
+        }
+        shuffle(wordsByMilestone[0])
+        shuffle(wordsByMilestone[1])
+        shuffle(wordsByMilestone[2])
+        shuffle(wordsByMilestone[3])
+        shuffle(wordsByMilestone[4])
+        const setWords = [
+            ...wordsByMilestone[0],
+            ...wordsByMilestone[1],
+            ...wordsByMilestone[2],
+            ...wordsByMilestone[3],
+            ...wordsByMilestone[4],
+        ]
+
+        updateGameUI(setWords)
+    }
+    doEffect()
 
     return dom('div', {},
         gameContainerEl,

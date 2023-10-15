@@ -1,14 +1,16 @@
 import { html, dom } from "../dom.js";
-import { loadWords } from "../words.js";
+import { currentMilestone } from "../words.js";
 import { milestoneToAsset } from "../words.js";
 
-export default function Score({ wordList }) {
-    const words = loadWords()
+export default function Score({ allScoresList }) {
+    // const words = loadWords()
+
+    // console.log({ wordList });
 
     const milestoneMap = {}
-    for (const word of wordList) {
-        // const score = words.getScore(word)
-        const milestone = words.currentMilestone(word)
+    for (const score of allScoresList) {
+        // console.log({ word });
+        const milestone = currentMilestone(score)
         if (!(milestone in milestoneMap)) {
             milestoneMap[milestone] = 0
         }

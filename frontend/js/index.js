@@ -1,11 +1,12 @@
 import { navigateTo, updateUI } from './navigation.js'
+import LoginView from './views/LoginView.js'
 
 import SetsView from './views/SetsView.js'
 
 window.addEventListener('load', async () => {
     const splash = document.querySelector('.splashscreen')
     await import('@material/web/all.js')
-    navigateTo(SetsView)
+    navigateTo(LoginView)
     setTimeout(() => {
         splash.style.opacity = '0'
         setTimeout(() => {

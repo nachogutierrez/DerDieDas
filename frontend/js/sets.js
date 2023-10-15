@@ -1,3 +1,6 @@
+import { getFirestore, collection, addDoc, setDoc, getDocs, getDoc, deleteDoc, doc } from 'firebase/firestore'
+import { getApp, getUser } from './firebase.js'
+
 const CACHE_KEY = "cached_sets"
 
 function saveSets(sets) {
@@ -75,4 +78,69 @@ export function Sets(serializedSets = "", save = () => { }) {
         removeWord,
         serialize
     }
+}
+
+export function FirestoreSets() {
+
+    const app = getApp()
+    if (!app) {
+        throw new Error(`FirestoreSets requires Firebase app to be initialized`)
+    }
+    const user = getUser()
+    if (!user) {
+        throw new Error(`FirestoreSets requires user to be logged in`)
+    }
+    const db = getFirestore(app)
+
+    async function _runQuery(query) {
+        const querySnapshot = await getDocs(query)
+        let documents = []
+        querySnapshot.forEach(doc => documents.push(doc))
+        return documents
+    }
+
+    async function _docExists(docRef) {
+        const docSnapshot = await getDoc(docRef)
+        return docSnapshot.exists()
+    }
+
+    const self = {
+        async getSets() {
+            return _runQuery(collection(db, 'Users', user.uid, 'Sets'))
+        },
+        async addSet(setName) {
+            if (await self.hasSet(setName)) {
+                throw new Error(`Set '${setName}' already exists`)
+            }
+
+            return setDoc(doc(db, 'Users', user.uid, 'Sets', setName), {
+                creatorUID: user.uid
+            })
+        },
+        async removeSet(setName) {
+            return deleteDoc(doc(db, 'Users', user.uid, 'Sets', setName))
+        },
+        async hasSet(setName) {
+            return _docExists(doc(db, 'Users', user.uid, 'Sets', setName))
+        },
+        async getWords(setName) {
+            return _runQuery(collection(db, 'Users', user.uid, 'Sets', setName, 'Words'))
+        },
+        async addWord(setName, word) {
+            if (await self.hasWord(setName, word)) {
+                throw new Error(`Set '${setName}' already contains word ${word}`)
+            }
+
+            return setDoc(doc(db, 'Users', user.uid, 'Sets', setName, 'Words', word), {
+                creatorUID: user.uid
+            })
+        },
+        async removeWord(setName, word) {
+            return deleteDoc(doc(db, 'Users', user.uid, 'Sets', setName, 'Words', word))
+        },
+        async hasWord(setName, word) {
+            return _docExists(doc(db, 'Users', user.uid, 'Sets', setName, 'Words', word))
+        }
+    }
+    return self
 }

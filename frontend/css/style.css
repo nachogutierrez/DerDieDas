@@ -27,17 +27,6 @@ body {
     transition: width 0.3s ease;
 }
 
-/* .sets {
-    display: flex;
-    flex-direction: column;
-    background: blue;
-}
-
-.sets .set {
-    padding: 8px;
-    background: red;
-} */
-
 .damage-effect {
     position: absolute;
     top: 0;
@@ -71,6 +60,26 @@ body {
     justify-content: center;
     background: #caa6f6;
     transition: all 1s ease-out;
+}
+
+.google-button {
+    content: url('/assets/googleloginbutton/x2/btn_google_signin_light_normal_web@2x.png');
+}
+
+.google-button:hover {
+    cursor: pointer;
+}
+
+.google-button:disabled {
+    content: url('assets/googleloginbutton/x2/btn_google_signin_light_disabled_web@2x.png');
+}
+
+.google-button:focus {
+    content: url('/assets/googleloginbutton/x2/btn_google_signin_light_focus_web@2x.png');
+}
+
+.google-button:active {
+    content: url('/assets/googleloginbutton/x2/btn_google_signin_light_pressed_web@2x.png');
 }
 
 .mobile-only {
