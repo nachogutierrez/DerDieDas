@@ -3,7 +3,7 @@ import { initialize, checkGoogleSession, googleLogIn } from "../firebase.js";
 import { navigateTo, onNextNavigate } from "../navigation.js";
 
 import SetsView from "./SetsView.js";
-import { sleep } from "../promises.js";
+import { downloadData, startStateUploader } from "../storage.js";
 
 export default function LoginView() {
 
@@ -11,7 +11,9 @@ export default function LoginView() {
         await initialize()
         const user = await checkGoogleSession()
         if (user) {
+            await downloadData()
             navigateTo(SetsView)
+            startStateUploader()
         }
     }
     doEffect()
@@ -20,7 +22,9 @@ export default function LoginView() {
         await googleLogIn()
         const user = await checkGoogleSession()
         if (user) {
+            await downloadData()
             navigateTo(SetsView)
+            startStateUploader()
         }
     }
 

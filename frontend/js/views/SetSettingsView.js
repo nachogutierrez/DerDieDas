@@ -1,7 +1,7 @@
 import { dom, html } from '../dom.js'
-import { FirestoreSets } from '../sets.js'
+import { getSetsClient } from '../sets.js'
 import {
-    FirestoreWords,
+    getWordsClient,
     currentMilestone,
     getActualScore,
     getExperience,
@@ -28,30 +28,17 @@ async function handleSearchBarChange(api, query, onWordsReady) {
     const response = await api.search(query)
     // Remove progress
 
-    // onWordsReady(Object.keys(response).map(word => ({ word, translation: response[word].translation })))
     onWordsReady(response)
 }
 
 async function handleAddWord(sets, setName, word) {
-    sets.addWord(setName, word)
+    await sets.addWord(setName, word)
     updateUI()
 }
 
-async function handleAddWordToFirestore(firestoreSets, setName, word) {
-    await firestoreSets.addWord(setName, word)
-    updateUI()
-}
-
-function handleDeleteWord(sets, setName, word) {
+async function handleDeleteWord(sets, setName, word) {
     if (confirm(`Are you sure you want to delete word '${word}'`)) {
-        sets.removeWord(setName, word)
-        updateUI()
-    }
-}
-
-async function handleDeleteWordFromFirestore(firestoreSets, setName, word) {
-    if (confirm(`Are you sure you want to delete word '${word}'`)) {
-        await firestoreSets.removeWord(setName, word)
+        await sets.removeWord(setName, word)
         updateUI()
     }
 }
@@ -62,31 +49,28 @@ function handleWordClick(word) {
 
 // TODO: add translation
 export default function SetSettingsView({ setName }) {
-    const firestoreSets = FirestoreSets()
-    const firestoreWords = FirestoreWords()
+    const sets = getSetsClient()
+    const words = getWordsClient()
 
     const containerEl = dom('div', {})
 
     async function doEffect() {
-        const wordDocuments = await firestoreSets.getWords(setName)
-        const wordList = wordDocuments.map(doc => doc.id)
+        const wordList = await sets.getWords(setName)
 
         const allScores = {}
         const allScoresList = []
-        const allFirestoreWords = {}
-        const allFirestoreWordsList = await Promise.all(wordList.map(firestoreWords.getWord))
-
-        allFirestoreWordsList.forEach(firestoreWord => {
-            allFirestoreWords[firestoreWord.id] = firestoreWord
-            const { score, lastUpdated } = firestoreWord.data()
-            allScores[firestoreWord.id] = getActualScore(score, lastUpdated)
-            allScoresList.push(allScores[firestoreWord.id])
-        })
+        const allWords = {}
+        await Promise.all(wordList.map(async word => {
+            allWords[word] = await words.getWord(word)
+            const { score, lastUpdated } = allWords[word]
+            allScores[word] = getActualScore(score, lastUpdated)
+            allScoresList.push(allScores[word])
+        }))
 
         const api = await getApi()
 
         const addWordDialog = AddWordDialog({
-            onConfirm: word => handleAddWordToFirestore(firestoreSets, setName, word),
+            onConfirm: word => handleAddWord(sets, setName, word),
             onSearch: (query, onWordsReady) => handleSearchBarChange(api, query, onWordsReady)
         })
 
@@ -104,11 +88,9 @@ export default function SetSettingsView({ setName }) {
                         const { key, singular, plural, article, translations } = await api.get(word)
                         const score = allScores[word]
 
-                        console.log({ word, score, experience: getExperience(score) });
-
                         const endSlotComponents = [
                             IconButton({ icon: 'settings', onClick: () => { } }),
-                            IconButton({ icon: 'delete', onClick: () => handleDeleteWordFromFirestore(firestoreSets, setName, key) })
+                            IconButton({ icon: 'delete', onClick: () => handleDeleteWord(sets, setName, key) })
                         ]
                         if (currentMilestone(score) < 4) {
                             endSlotComponents.unshift(ExperienceBar({ experience: getExperience(score) }))

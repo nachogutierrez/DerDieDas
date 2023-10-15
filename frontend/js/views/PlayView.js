@@ -1,7 +1,7 @@
 import { dom, html } from '../dom.js'
-import { FirestoreSets } from '../sets.js'
+import { getSetsClient } from '../sets.js'
 import {
-    FirestoreWords,
+    getWordsClient,
     currentMilestone,
     getActualScore,
     getExperience,
@@ -19,29 +19,21 @@ import Column from '../components/Column.js'
 import Level from '../components/Level.js'
 import MilestoneIcon from '../components/MilestoneIcon.js'
 
-function handleMissFirestore(firestoreWords, word, score) {
+function handleMiss(words, word, score) {
     const newScore = updateScore(score, false)
-    return firestoreWords.updateWord(word, newScore)
+    return words.updateWord(word, newScore)
 }
 
-function handleMiss(words, word) {
-    words.miss(word)
-}
-
-function handleHitFirestore(firestoreWords, word, score) {
+function handleHit(words, word, score) {
     const newScore = updateScore(score, true)
-    return firestoreWords.updateWord(word, newScore)
-}
-
-function handleHit(words, word) {
-    words.hit(word)
+    return words.updateWord(word, newScore)
 }
 
 export default function PlayView({ setName }) {
     const api = getApi()
-    const firestoreSets = FirestoreSets()
-    const firestoreWords = FirestoreWords()
-    let allFirestoreWords = {}
+    const sets = getSetsClient()
+    const words = getWordsClient()
+    let allWords = {}
 
     let currentWordIndex = 0
     let alreadyGuessed = false
@@ -55,8 +47,7 @@ export default function PlayView({ setName }) {
         if (currentWordIndex < setWords.length) {
             const word = setWords[currentWordIndex]
             const wordDetails = await (await api).get(word)
-            const firestoreWord = allFirestoreWords[word]
-            const { score, lastUpdated } = firestoreWord.data()
+            const { score, lastUpdated } = allWords[word]
             const actualScore = getActualScore(score, lastUpdated)
             const milestone = currentMilestone(actualScore)
             const experience = getExperience(actualScore)
@@ -89,7 +80,7 @@ export default function PlayView({ setName }) {
                         buttons[article].setAttribute('disabled', true)
                         if (!alreadyGuessed) {
                             alreadyGuessed = true
-                            await handleMissFirestore(firestoreWords, word, actualScore)
+                            await handleMiss(words, word, actualScore)
                             animating = true
                             showDamageEffect(damageEffectEl)
                             if (milestone === 4) {
@@ -126,7 +117,7 @@ export default function PlayView({ setName }) {
                     }
                     if (!alreadyGuessed) {
                         alreadyGuessed = true
-                        await handleHitFirestore(firestoreWords, word, actualScore)
+                        await handleHit(words, word, actualScore)
                         if (!isMaxScore(actualScore)) {
                             animating = true
                             if (willLevelUp(actualScore)) {
@@ -189,12 +180,10 @@ export default function PlayView({ setName }) {
     }
 
     async function doEffect() {
-        const wordDocuments = await firestoreSets.getWords(setName)
-        const wordList = wordDocuments.map(doc => doc.id)
-        const allFirestoreWordsList = await Promise.all(wordList.map(firestoreWords.getWord))
-        allFirestoreWordsList.forEach(fw => {
-            allFirestoreWords[fw.id] = fw
-        })
+        const wordList = await sets.getWords(setName)
+        await Promise.all(wordList.map(async word => {
+            allWords[word] = await words.getWord(word)
+        }))
 
         const wordsByMilestone = {}
         wordsByMilestone[0] = []
@@ -203,9 +192,7 @@ export default function PlayView({ setName }) {
         wordsByMilestone[3] = []
         wordsByMilestone[4] = []
         for (let word of wordList) {
-            // Maybe fetch all firestore words once and use cache afterwards
-            const firestoreWord = allFirestoreWords[word]
-            const { score, lastUpdated } = firestoreWord.data()
+            const { score, lastUpdated } = allWords[word]
             const actualScore = getActualScore(score, lastUpdated)
             const milestone = currentMilestone(actualScore)
             wordsByMilestone[milestone].push(word)

@@ -165,6 +165,73 @@ export function Words(serializedWords = "", save = () => { }) {
     return obj
 }
 
+// TODO: read from settings which client to use
+export function getWordsClient() {
+    return LocalWords()
+}
+
+export function LocalWords(prefix) {
+
+    const cacheKeyPrefix = `${prefix}_LocalWords`
+
+    const lastUpdateKey = () => `${cacheKeyPrefix}_lastUpdate`
+    const allWordsKey = () => `${cacheKeyPrefix}_Words`
+    const wordKey = word => `${cacheKeyPrefix}_Words_${word}`
+
+    function _updateLastUpdate() {
+        localStorage.setItem(lastUpdateKey(), `${new Date().getTime()}`)
+    }
+
+    const self = {
+        getWords() {
+            return JSON.parse(localStorage.getItem(allWordsKey()) || '[]')
+        },
+        getWord(word) {
+            return JSON.parse(localStorage.getItem(wordKey(word)) || `{ "score": 0, "lastUpdated": 0 }`)
+        },
+        updateWord(word, newScore) {
+            const now = new Date().getTime()
+            const allWords = self.getWords()
+            if (!allWords.includes(word)) {
+                allWords.push(word)
+                allWords.sort()
+                localStorage.setItem(allWordsKey(), JSON.stringify(allWords))
+            }
+            localStorage.setItem(wordKey(word), JSON.stringify({ score: newScore, lastUpdated: now }))
+            _updateLastUpdate()
+        },
+        updateWordWithTime(word, newData) {
+            const allWords = self.getWords()
+            if (!allWords.includes(word)) {
+                allWords.push(word)
+                allWords.sort()
+                localStorage.setItem(allWordsKey(), JSON.stringify(allWords))
+            }
+            localStorage.setItem(wordKey(word), JSON.stringify(newData))
+            _updateLastUpdate()
+        },
+        readAll() {
+            const allData = {}
+            const allWords = self.getWords()
+            for (let word of allWords) {
+                allData[word] = self.getWord(word)
+            }
+            return allData
+        },
+        clearData() {
+            const allWords = self.getWords()
+            for (let word of allWords) {
+                localStorage.removeItem(wordKey(word))
+            }
+            localStorage.removeItem(allWordsKey())
+        },
+        lastUpdate() {
+            return parseInt(localStorage.getItem(lastUpdateKey()) || '0', 10)
+        }
+    }
+    return self
+}
+
 export function FirestoreWords() {
 
     const app = getApp()
@@ -177,16 +244,11 @@ export function FirestoreWords() {
     }
     const db = getFirestore(app)
 
-    function _wordTemplate(word) {
+    function _wordTemplate() {
         return {
-            id: word,
-            data() {
-                return {
-                    score: 0,
-                    lastUpdated: 0,
-                    creatorUID: user.uid
-                }
-            }
+            score: 0,
+            lastUpdated: 0,
+            creatorUID: user.uid
         }
     }
 
@@ -194,9 +256,9 @@ export function FirestoreWords() {
         async getWord(word) {
             const docSnapshot = await getDoc(doc(db, 'Users', user.uid, 'Words', word))
             if (!docSnapshot.exists()) {
-                return _wordTemplate(word)
+                return _wordTemplate()
             }
-            return docSnapshot
+            return docSnapshot.data()
         },
         async updateWord(word, newScore) {
             const now = new Date().getTime()
@@ -205,7 +267,7 @@ export function FirestoreWords() {
                 lastUpdated: now,
                 creatorUID: user.uid
             }
-            return setDoc(doc(db, 'Users', user.uid, 'Words', word), newData)
+            await setDoc(doc(db, 'Users', user.uid, 'Words', word), newData)
         }
     }
     return self
