@@ -137,7 +137,7 @@ export function LocalSets(prefix = '') {
         },
         removeWord(setName, word) {
             const words = self.getWords(setName).filter(name => name !== word)
-            localStorage(wordIdsKey(setName), words)
+            localStorage.removeItem(wordIdsKey(setName), words)
             _updateLastUpdate()
         },
         hasWord(setName, word) {

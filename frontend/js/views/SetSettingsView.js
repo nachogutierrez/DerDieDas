@@ -85,7 +85,7 @@ export default function SetSettingsView({ setName }) {
                 List({
                     addDivider: true,
                     items: await Promise.all(wordList.map(async word => {
-                        const { key, singular, plural, article, translations } = await api.get(word)
+                        let { key, singular, plural, article, translations } = await api.get(word)
                         const score = allScores[word]
 
                         const endSlotComponents = [
@@ -97,6 +97,7 @@ export default function SetSettingsView({ setName }) {
                         } else {
                             endSlotComponents.unshift(ExperienceBar({ experience: 1, isMaxedOut: true }))
                         }
+
 
                         return {
                             headline: `${capitalizeFirst(article)} ${key}`,
